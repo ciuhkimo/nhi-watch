@@ -1,0 +1,56 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import type { ApiResponse } from "@/types";
+import { Prisma } from "@prisma/client";
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get("search") || "";
+    const category = searchParams.get("category") || "";
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+    const offset = (page - 1) * limit;
+
+    const where: Prisma.PaymentWhereInput = {};
+
+    if (search) {
+      where.OR = [
+        { code: { contains: search } },
+        { name: { contains: search } },
+      ];
+    }
+
+    if (category) {
+      where.category = category;
+    }
+
+    const [payments, total] = await Promise.all([
+      prisma.payment.findMany({
+        where,
+        skip: offset,
+        take: limit,
+        orderBy: [{ code: "asc" }],
+      }),
+      prisma.payment.count({ where }),
+    ]);
+
+    const response: ApiResponse<typeof payments> = {
+      success: true,
+      data: payments,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+
+    return NextResponse.json(response);
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "查詢診療支付失敗" },
+      { status: 500 }
+    );
+  }
+}
