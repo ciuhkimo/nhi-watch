@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 藥品給付
+model Drug {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique          // 健保代碼（10碼）
+  name         String                    // 品名
+  generic      String?                   // 學名
+  form         String?                   // 劑型
+  strength     String?                   // 規格含量
+  price        Float                     // 健保價（元）
+  unit         String?                   // 計價單位
+  atcCode      String?                   // ATC 分類碼
+  manufacturer String?                   // 製造商
+  category     String?                   // 口服/注射/外用
+  startDate    String?                   // 生效日（ISO 8601）
+  endDate      String?                   // 終止日
+  status       String   @default("給付中")
+  note         String?
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  // HIS 介接預留欄位
+  hospitalCode String?                   // 院內藥碼（未來由 HIS 對照填入）
+
+  @@index([code])
+  @@index([atcCode])
+  @@index([status])
+}
+
+// 特材給付
+model Device {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  name         String
+  category     String?                   // 科別
+  price        Float                     // 健保給付價
+  selfPay      Float    @default(0)      // 差額負擔上限
+  unit         String?
+  startDate    String?
+  status       String   @default("給付中")
+  note         String?
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  hospitalCode String?                   // 院內特材碼
+
+  @@index([code])
+  @@index([category])
+}
+
+// 診療支付標準
+model Payment {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique          // 診療代碼
+  name         String
+  category     String?
+  price        Float                     // 支付點數
+  unit         String?
+  startDate    String?
+  note         String?
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@index([code])
+  @@index([category])
+}
+
+// 異動紀錄（自動產生）
+model ChangeLog {
+  id           Int      @id @default(autoincrement())
+  date         String                    // 異動日期
+  tableName    String                    // drugs / devices / payments
+  itemCode     String                    // 品項代碼
+  itemName     String                    // 品項名稱（方便顯示）
+  changeType   String                    // 新增 / 調價 / 停用
+  field        String?                   // 異動欄位名稱
+  oldValue     String?
+  newValue     String?
+  createdAt    DateTime @default(now())
+
+  @@index([date])
+  @@index([tableName])
+  @@index([changeType])
+}
+
+// 同步紀錄
+model SyncLog {
+  id           Int      @id @default(autoincrement())
+  source       String                    // 資料來源標識
+  status       String                    // success / failed
+  records      Int?                      // 處理筆數
+  changes      Int?                      // 偵測異動數
+  startedAt    DateTime
+  finishedAt   DateTime?
+  errorMsg     String?
+}
+
+// HIS 藥碼對照表（未來介接用）
+model DrugMapping {
+  id             Int      @id @default(autoincrement())
+  nhiCode        String                  // 健保碼
+  hospitalCode   String                  // 院內藥碼
+  hospitalName   String?                 // 院內品名
+  mappedAt       DateTime @default(now())
+  mappedBy       String?                 // 建立者
+
+  @@unique([nhiCode, hospitalCode])
+  @@index([nhiCode])
+  @@index([hospitalCode])
+}
