@@ -57,18 +57,26 @@ nhi-watch/
 
 ## 四、Phase 2 開發順序（建議每個 Session 一個 commit）
 
-| Session | 功能 | 預估 | 重點提醒 |
-|---------|------|------|----------|
-| **1** | 專案骨架 + Prisma schema + DB migration | 2hr | `npx create-next-app`、貼入 SPEC.md 的 Prisma schema、`npx prisma migrate dev` |
-| **2** | 健保署 API 串接 + CSV 解析器 | 3hr | Big5/UTF-8 自動偵測（iconv-lite + chardet）、rate limit 間隔 1 秒、Resource ID: `A21030000I-E41001-001` |
-| **3** | 藥品查詢頁面 | 3hr | 全欄位模糊搜尋、排序、展開詳情、RWD 表格（手機隱藏學名/劑型） |
-| **4** | 特材查詢頁面 | 2hr | 卡片式排版、健保價（藍）vs 差額負擔（橘）突顯 |
-| **5** | 診療支付頁面 | 2hr | 分類篩選按鈕群組、分類從 DB 動態產生 |
-| **6** | 異動偵測引擎 + 異動紀錄頁 | 3hr | diff 比對邏輯（新增/調價/停用）、按日期分組時間軸 |
-| **7** | 排程同步 + LINE Notify | 2hr | node-cron 07:00 同步、07:30 摘要、即時異動推播 |
-| **8** | 總覽儀表板 + 統計 API | 2hr | 4 張 StatCard、近期異動、同步狀態面板 |
-| **9** | 測試 + Bug 修復 | 3hr | API endpoint 測試、edge case（空資料、Big5 CSV、超長品名） |
-| **10** | 部署設定 | 2hr | PM2（院內）或 Vercel（雲端）、cron job、環境變數 |
+| Session | 功能 | 預估 | 狀態 | 重點提醒 |
+|---------|------|------|------|----------|
+| **1** | 專案骨架 + Prisma schema + DB migration | 2hr | ✅ 完成 | `npx create-next-app`、貼入 SPEC.md 的 Prisma schema、`npx prisma migrate dev` |
+| **2** | 健保署 API 串接 + CSV 解析器 | 3hr | ✅ 完成 | Big5/UTF-8 自動偵測（iconv-lite + chardet）、rate limit 間隔 1 秒、Resource ID: `A21030000I-E41001-001` |
+| **3** | 藥品查詢頁面 | 3hr | ✅ 完成 | 全欄位模糊搜尋、排序、展開詳情、RWD 表格（手機隱藏學名/劑型） |
+| **4** | 特材查詢頁面 | 2hr | ✅ 完成 | 卡片式排版、健保價（藍）vs 差額負擔（橘）突顯、科別按鈕篩選 |
+| **5** | 診療支付頁面 | 2hr | ⬜ 待做 | 分類篩選按鈕群組、分類從 DB 動態產生 |
+| **6** | 異動偵測引擎 + 異動紀錄頁 | 3hr | ⬜ 待做 | diff 比對邏輯（新增/調價/停用）、按日期分組時間軸 |
+| **7** | 排程同步 + LINE Notify | 2hr | ⬜ 待做 | node-cron 07:00 同步、07:30 摘要、即時異動推播 |
+| **8** | 總覽儀表板 + 統計 API | 2hr | ⬜ 待做 | 4 張 StatCard、近期異動、同步狀態面板 |
+| **9** | 測試 + Bug 修復 | 3hr | ⬜ 待做 | API endpoint 測試、edge case（空資料、Big5 CSV、超長品名） |
+| **10** | 部署設定 | 2hr | ⬜ 待做 | PM2（院內）或 Vercel（雲端）、cron job、環境變數 |
+
+### Session 3 完成摘要（2026-03-29）
+- `/drugs` 藥品查詢頁面：即時模糊搜尋（debounce 300ms）、分類/狀態篩選、表頭排序（健保碼/藥品名稱/健保價）、點擊展開詳情列、RWD 響應式表格（手機隱藏學名/劑型）、分頁導覽
+- 匯出按鈕預留（disabled），v1.1 啟用
+
+### Session 4 完成摘要（2026-03-29）
+- `/devices` 特材查詢頁面：即時模糊搜尋、科別按鈕群組篩選（從資料動態產生）、卡片式排版（2 欄桌面/1 欄手機）、健保價藍色 vs 差額負擔橘色突顯、分頁
+- 注意：TypeScript target 不支援 `[...new Set()]`，需用 `Array.from(new Set())`
 
 ---
 
