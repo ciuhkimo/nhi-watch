@@ -130,12 +130,14 @@ nhi-watch/
 | 優先序 | 項目 | 說明 |
 |--------|------|------|
 | ~~1~~ | ~~特材資料爬蟲~~ | ✅ 已完成，22,816 筆從 INAE2000 API 自動同步 |
-| 2 | 匯出 Excel | 各查詢頁面新增匯出功能（按鈕已預留） |
-| 3 | 日期範圍篩選 | 異動紀錄增加日期 picker |
-| 4 | 測試覆蓋率 | API endpoint 單元測試、CSV 解析 edge case |
-| 5 | 部署上線 | PM2 院內部署或 Vercel 雲端，設定 LINE_NOTIFY_TOKEN |
+| ~~2~~ | ~~匯出 Excel~~ | ✅ 已完成，藥品/特材/診療三頁面皆可匯出 .xlsx |
+| ~~3~~ | ~~日期範圍篩選~~ | ✅ 已完成，異動紀錄頁 from/to date picker |
+| ~~4~~ | ~~測試覆蓋率~~ | ✅ 已完成，Vitest 34 個單元測試 + 10 個 API 測試 |
+| ~~5~~ | ~~部署設定~~ | ✅ 已完成，Docker 多階段建置 + docker-compose |
 | 6 | 歷史藥價趨勢圖 | recharts 視覺化（v1.3） |
 | 7 | HIS 介接 | DrugMapping + SiSDCP 拋轉平台（v2.0） |
+| 8 | LINE Notify 設定 | 替換真實 token，測試推播 |
+| 9 | 院內伺服器部署 | docker compose up -d，設定 cron 排程 |
 
 ---
 
