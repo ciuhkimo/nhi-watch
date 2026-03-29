@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface Drug {
   id: number;
@@ -138,9 +139,25 @@ export default function DrugsPage() {
               ))}
             </select>
             <button
-              className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-400 bg-slate-50 border border-slate-200 rounded-lg cursor-not-allowed opacity-60"
-              title="匯出功能將於 v1.1 推出"
-              disabled
+              className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition"
+              onClick={() =>
+                exportToExcel(
+                  sorted as unknown as Record<string, unknown>[],
+                  [
+                    { key: "code", label: "健保碼" },
+                    { key: "name", label: "藥品名稱" },
+                    { key: "generic", label: "學名" },
+                    { key: "price", label: "健保價" },
+                    { key: "form", label: "劑型" },
+                    { key: "category", label: "類別" },
+                    { key: "atcCode", label: "ATC碼" },
+                    { key: "manufacturer", label: "製造商" },
+                    { key: "status", label: "狀態" },
+                  ],
+                  "藥品查詢"
+                )
+              }
+              disabled={sorted.length === 0}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="w-4 h-4">
                 <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />

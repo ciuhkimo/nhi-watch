@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface Payment {
   id: number;
@@ -118,8 +119,31 @@ export default function PaymentsPage() {
             </div>
           )}
         </div>
-        <div className="mt-2 text-xs text-slate-400">
-          共 {pagination.total.toLocaleString()} 筆結果
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-xs text-slate-400">
+            共 {pagination.total.toLocaleString()} 筆結果
+          </span>
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition"
+            onClick={() =>
+              exportToExcel(
+                payments as unknown as Record<string, unknown>[],
+                [
+                  { key: "code", label: "診療代碼" },
+                  { key: "name", label: "項目名稱" },
+                  { key: "category", label: "分類" },
+                  { key: "price", label: "支付點數" },
+                ],
+                "診療支付查詢"
+              )
+            }
+            disabled={payments.length === 0}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="w-3.5 h-3.5">
+              <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            匯出
+          </button>
         </div>
       </div>
 
