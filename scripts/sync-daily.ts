@@ -1,4 +1,5 @@
 import { syncAll } from "../src/lib/sync-engine";
+import { notifyChanges, notifyDailySummary } from "../src/lib/notify";
 
 async function main() {
   console.log("=== NHI-Watch 每日同步 ===");
@@ -17,11 +18,16 @@ async function main() {
     }
   }
 
+  // 發送即時異動通知
+  await notifyChanges(results);
+
   console.log(`\n完成時間: ${new Date().toISOString()}`);
-  process.exit(0);
 }
 
 main().catch((err) => {
   console.error("同步失敗:", err);
   process.exit(1);
 });
+
+// 每日摘要推播（可由獨立 cron 呼叫）
+export { notifyDailySummary };
