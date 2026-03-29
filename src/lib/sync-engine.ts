@@ -50,7 +50,7 @@ export async function syncDrugs(): Promise<SyncResult> {
           category: drug.category,
           startDate: drug.startDate,
           endDate: drug.endDate,
-          status: drug.endDate ? "停用" : "給付中",
+          status: drug.endDate && drug.endDate < new Date().toISOString().split("T")[0] ? "停用" : "給付中",
         },
         create: {
           code: drug.code,
@@ -65,7 +65,7 @@ export async function syncDrugs(): Promise<SyncResult> {
           category: drug.category,
           startDate: drug.startDate,
           endDate: drug.endDate,
-          status: drug.endDate ? "停用" : "給付中",
+          status: drug.endDate && drug.endDate < new Date().toISOString().split("T")[0] ? "停用" : "給付中",
         },
       });
     }
