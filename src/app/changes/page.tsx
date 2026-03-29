@@ -36,12 +36,16 @@ export default function ChangesPage() {
   });
   const [loading, setLoading] = useState(false);
   const [typeFilter, setTypeFilter] = useState("全部");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const fetchChanges = useCallback(async (page: number) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (typeFilter !== "全部") params.set("type", typeFilter);
+      if (dateFrom) params.set("from", dateFrom);
+      if (dateTo) params.set("to", dateTo);
       params.set("page", String(page));
       params.set("limit", "50");
 
@@ -54,7 +58,7 @@ export default function ChangesPage() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter]);
+  }, [typeFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     fetchChanges(1);
@@ -76,24 +80,50 @@ export default function ChangesPage() {
       </div>
 
       {/* 篩選 */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-500 mr-2">篩選：</span>
-          {TYPES.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTypeFilter(t)}
-              className={`px-3 py-1.5 text-xs rounded-lg font-medium transition ${
-                typeFilter === t
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+      <div className="bg-white rounded-xl border border-slate-200/80 p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-500 whitespace-nowrap">類型：</span>
+            {TYPES.map((t) => (
+              <button
+                key={t}
+                onClick={() => setTypeFilter(t)}
+                className={`px-3 py-1.5 text-xs rounded-lg font-medium transition ${
+                  typeFilter === t
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-500 whitespace-nowrap">日期：</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="px-2 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            />
+            <span className="text-xs text-slate-400">至</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="px-2 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                onClick={() => { setDateFrom(""); setDateTo(""); }}
+                className="px-2 py-1.5 text-xs text-slate-500 hover:text-slate-700 transition"
+              >
+                清除
+              </button>
+            )}
+          </div>
         </div>
-        <div className="mt-2 text-xs text-slate-400">
+        <div className="text-xs text-slate-400">
           共 {pagination.total.toLocaleString()} 筆異動
         </div>
       </div>
