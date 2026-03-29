@@ -4,8 +4,6 @@ import { parseCsvBuffer } from "./csv-parser";
 const NHI_API_BASE = process.env.NHI_API_BASE || "https://info.nhi.gov.tw";
 const DRUG_RESOURCE_ID =
   process.env.NHI_DRUG_RESOURCE_ID || "A21030000I-E41001-001";
-const PAYMENT_CSV_ID = process.env.NHI_PAYMENT_CSV_ID || "1381";
-
 // Rate limit: 每次請求間隔至少 1 秒
 const RATE_LIMIT_MS = 1000;
 let lastRequestTime = 0;
@@ -194,10 +192,36 @@ export async function fetchAllDrugs(): Promise<DrugData[]> {
 }
 
 /**
- * 下載並解析支付標準 CSV
+ * 從中文項目名稱推斷分類
+ */
+function classifyPayment(name: string): string | null {
+  if (!name) return null;
+  if (/診察費/.test(name)) return "診察費";
+  if (/藥事服務費|藥費/.test(name)) return "藥事服務費";
+  if (/護理費|照護/.test(name)) return "護理費";
+  if (/檢驗/.test(name)) return "檢驗費";
+  if (/檢查|超音波|X光|攝影/.test(name)) return "檢查費";
+  if (/處置|治療/.test(name)) return "處置費";
+  if (/手術/.test(name)) return "手術費";
+  if (/麻醉/.test(name)) return "麻醉費";
+  if (/材料|特材/.test(name)) return "材料費";
+  if (/注射|輸液/.test(name)) return "注射費";
+  if (/復健|物理治療|職能治療/.test(name)) return "復健費";
+  if (/精神|心理/.test(name)) return "精神醫療";
+  if (/牙|齒/.test(name)) return "牙科";
+  if (/中醫|針灸/.test(name)) return "中醫";
+  if (/放射|放療/.test(name)) return "放射治療";
+  if (/病房|住院/.test(name)) return "住院費";
+  return "其他";
+}
+
+/**
+ * 下載並解析支付標準 CSV（使用健保署開放資料 API）
  */
 export async function fetchPayments(): Promise<PaymentData[]> {
-  const url = `${NHI_API_BASE}/IODE0000/IODE0000S09?id=${PAYMENT_CSV_ID}`;
+  // 使用正確的 resource download API
+  const PAYMENT_RESOURCE_ID = "A21030000I-D20021-001";
+  const url = `${NHI_API_BASE}/api/iode0000s01/Dataset?rId=${PAYMENT_RESOURCE_ID}`;
 
   const response = await rateLimitedRequest(() =>
     axios.get(url, { responseType: "arraybuffer" })
@@ -206,12 +230,30 @@ export async function fetchPayments(): Promise<PaymentData[]> {
   const buffer = Buffer.from(response.data);
   const records = parseCsvBuffer(buffer);
 
-  return records.map((row) => ({
-    code: row["診療代碼"] || row["代碼"] || row["col0"] || "",
-    name: row["項目名稱"] || row["名稱"] || row["col1"] || "",
-    category: row["分類"] || row["col2"] || null,
-    price: parseFloat(row["支付點數"] || row["點數"] || row["col3"] || "0") || 0,
-    unit: row["單位"] || null,
-    startDate: row["生效日期"] || null,
-  }));
+  return records
+    .map((row) => {
+      const code = row["診療項目代碼"] || row["診療代碼"] || row["代碼"] || "";
+      const name = row["中文項目名稱"] || row["項目名稱"] || row["名稱"] || "";
+      const priceStr = row["健保支付點數"] || row["支付點數"] || row["點數"] || "0";
+      const startDateRaw = row["生效起日"] || row["生效日期"] || "";
+
+      // 生效日可能是民國或西元格式
+      let startDate: string | null = null;
+      if (startDateRaw.length === 8 && !startDateRaw.includes("-")) {
+        // YYYYMMDD 格式
+        startDate = `${startDateRaw.slice(0, 4)}-${startDateRaw.slice(4, 6)}-${startDateRaw.slice(6, 8)}`;
+      } else if (startDateRaw) {
+        startDate = startDateRaw;
+      }
+
+      return {
+        code,
+        name,
+        category: classifyPayment(name),
+        price: parseFloat(priceStr) || 0,
+        unit: null,
+        startDate,
+      };
+    })
+    .filter((p) => p.code && p.name);
 }
