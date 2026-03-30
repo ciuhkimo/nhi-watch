@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { fetchAllDrugs, fetchPayments } from "./nhi-api";
+import { fetchAllDrugs, fetchAllDevices, fetchPayments } from "./nhi-api";
 import { detectDrugChanges, detectPaymentChanges, saveChanges } from "./diff-detector";
 
 interface SyncResult {
@@ -34,6 +34,24 @@ export async function syncDrugs(): Promise<SyncResult> {
     // 3. 寫入異動紀錄
     const changeCount = await saveChanges("drugs", changes);
 
+    // 3b. 記錄藥價歷史（新增與調價品項）
+    const priceChangeItems = changes.filter(
+      (c) => c.changeType === "調價" || c.changeType === "新增"
+    );
+    if (priceChangeItems.length > 0) {
+      const today = new Date().toISOString().split("T")[0];
+      const drugPriceMap = new Map(drugs.map((d) => [d.code, d.price]));
+      await prisma.priceHistory.createMany({
+        data: priceChangeItems
+          .filter((c) => drugPriceMap.has(c.itemCode))
+          .map((c) => ({
+            drugCode: c.itemCode,
+            price: drugPriceMap.get(c.itemCode)!,
+            date: today,
+          })),
+      });
+    }
+
     // 4. 批次 upsert 藥品資料
     for (const drug of drugs) {
       await prisma.drug.upsert({
@@ -50,7 +68,8 @@ export async function syncDrugs(): Promise<SyncResult> {
           category: drug.category,
           startDate: drug.startDate,
           endDate: drug.endDate,
-          status: drug.endDate ? "停用" : "給付中",
+          regulationUrl: drug.regulationUrl,
+          status: drug.endDate && drug.endDate < new Date().toISOString().split("T")[0] ? "停用" : "給付中",
         },
         create: {
           code: drug.code,
@@ -65,7 +84,8 @@ export async function syncDrugs(): Promise<SyncResult> {
           category: drug.category,
           startDate: drug.startDate,
           endDate: drug.endDate,
-          status: drug.endDate ? "停用" : "給付中",
+          regulationUrl: drug.regulationUrl,
+          status: drug.endDate && drug.endDate < new Date().toISOString().split("T")[0] ? "停用" : "給付中",
         },
       });
     }
@@ -220,11 +240,108 @@ export async function syncPayments(): Promise<SyncResult> {
 }
 
 /**
- * 執行全部同步（藥品 + 診療支付）
+ * 同步特材品項（從健保署 INAE2000 API 爬取）
+ */
+export async function syncDevices(): Promise<SyncResult> {
+  const startedAt = new Date();
+
+  try {
+    const devices = await fetchAllDevices();
+
+    let changeCount = 0;
+
+    for (const device of devices) {
+      // 偵測是否為新增
+      const existing = await prisma.device.findUnique({
+        where: { code: device.code },
+        select: { price: true },
+      });
+
+      if (!existing) {
+        changeCount++;
+      } else if (existing.price !== device.price) {
+        changeCount++;
+      }
+
+      await prisma.device.upsert({
+        where: { code: device.code },
+        update: {
+          name: device.name,
+          category: device.category,
+          price: device.price,
+          selfPay: device.selfPay,
+          unit: device.unit,
+          startDate: device.startDate,
+          status: "給付中",
+        },
+        create: {
+          code: device.code,
+          name: device.name,
+          category: device.category,
+          price: device.price,
+          selfPay: device.selfPay,
+          unit: device.unit,
+          startDate: device.startDate,
+          status: "給付中",
+        },
+      });
+    }
+
+    const finishedAt = new Date();
+    const duration = finishedAt.getTime() - startedAt.getTime();
+
+    await prisma.syncLog.create({
+      data: {
+        source: "devices",
+        status: "success",
+        records: devices.length,
+        changes: changeCount,
+        startedAt,
+        finishedAt,
+      },
+    });
+
+    return {
+      source: "devices",
+      status: "success",
+      records: devices.length,
+      changes: changeCount,
+      duration,
+    };
+  } catch (error) {
+    const finishedAt = new Date();
+    const errorMsg = error instanceof Error ? error.message : "未知錯誤";
+
+    await prisma.syncLog.create({
+      data: {
+        source: "devices",
+        status: "failed",
+        records: 0,
+        changes: 0,
+        startedAt,
+        finishedAt,
+        errorMsg,
+      },
+    });
+
+    return {
+      source: "devices",
+      status: "failed",
+      records: 0,
+      changes: 0,
+      duration: finishedAt.getTime() - startedAt.getTime(),
+      errorMsg,
+    };
+  }
+}
+
+/**
+ * 執行全部同步（藥品 + 特材 + 診療支付）
  */
 export async function syncAll(): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
   results.push(await syncDrugs());
+  results.push(await syncDevices());
   results.push(await syncPayments());
   return results;
 }

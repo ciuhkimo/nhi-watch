@@ -1,0 +1,15 @@
+services:
+  nhi-watch:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - nhi-data:/app/prisma
+    environment:
+      - DATABASE_URL=file:./dev.db
+      - LINE_NOTIFY_TOKEN=your-token-here
+      - NHI_API_BASE=https://info.nhi.gov.tw
+    restart: unless-stopped
+
+volumes:
+  nhi-data:

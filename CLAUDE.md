@@ -45,6 +45,7 @@ npx tsx scripts/sync-daily.ts      # 手動執行同步
 - `diff-detector.ts` — 異動偵測：比對新舊資料，判斷新增/調價/停用
 - `csv-parser.ts` — CSV 解析，自動偵測 Big5/UTF-8 編碼
 - `notify.ts` — LINE Notify：即時異動推播 + 每日 07:30 摘要
+- `regulation-search.ts` — 給付規定抓取、解析、全文搜尋
 
 ### API 端點（src/app/api/）
 所有 API 回傳統一格式 `{ success, data, pagination: { page, limit, total, totalPages } }`
@@ -57,13 +58,17 @@ npx tsx scripts/sync-daily.ts      # 手動執行同步
 | GET `/api/changes?type=&from=&to=` | 異動紀錄（按日期分組） |
 | GET `/api/stats` | 儀表板統計卡片數據 |
 | POST `/api/sync` | 手動觸發同步 |
+| GET `/api/drugs/[code]/price-history` | 藥品歷史藥價（趨勢圖用） |
+| GET `/api/drugs/[code]/regulation` | 單一藥品給付規定 |
+| GET `/api/regulations/search?q=&page=&limit=` | 給付規定全文搜尋 |
 
 ### 頁面（src/app/）
 - `/` — 總覽儀表板（4 張 StatCard + 近期異動時間軸 + 同步狀態）
-- `/drugs` — 藥品查詢（表格 + 可展開詳情，手機隱藏學名/劑型欄位）
+- `/drugs` — 藥品查詢（表格 + 可展開詳情 + 藥價趨勢圖 + 給付規定連結）
 - `/devices` — 特材查詢（卡片式排版，健保價藍色 vs 差額負擔橘色）
 - `/payments` — 診療支付（分類篩選按鈕群組）
 - `/changes` — 異動紀錄（按日期分組時間軸，綠新增/橘調價/紅停用）
+- `/regulations` — 給付規定全文搜尋（關鍵字高亮 + 展開全文）
 
 ### 資料庫核心表格
 - `drugs` — 藥品給付（代碼、品名、學名、藥價、ATC碼、製造商）
