@@ -161,7 +161,7 @@ function parseRegulationUrl(raw: string): string | null {
 
 function mapDrugRecord(raw: NhiDrugRaw): DrugData {
   return {
-    code: raw.Q1_ID || "",
+    code: raw.PAY_CODE || "",  // 健保給付代碼
     name: raw.NAME || "",
     generic: extractGeneric(raw.CLASSGROUPNAME),
     form: raw.DRUG_FORM || null,

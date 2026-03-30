@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { fetchAllDrugs, fetchAllDevices, fetchPayments } from "./nhi-api";
-import { detectDrugChanges, detectPaymentChanges, saveChanges } from "./diff-detector";
+import { detectDrugChanges, detectDeviceChanges, detectPaymentChanges, saveChanges } from "./diff-detector";
 
 const BATCH_SIZE = 500;
 
@@ -242,20 +242,19 @@ export async function syncDevices(): Promise<SyncResult> {
   try {
     const devices = await fetchAllDevices();
 
-    // 預先載入所有現有特材價格，避免逐筆查詢
-    const existingDevices = await prisma.device.findMany({
-      select: { code: true, price: true },
-    });
-    const existingPriceMap = new Map(existingDevices.map((d) => [d.code, d.price]));
+    // 偵測異動（新增/調價/停用）
+    const changes = await detectDeviceChanges(
+      devices.map((d) => ({
+        code: d.code,
+        name: d.name,
+        price: d.price,
+      }))
+    );
 
-    let changeCount = 0;
-    for (const device of devices) {
-      const existing = existingPriceMap.get(device.code);
-      if (existing === undefined || existing !== device.price) {
-        changeCount++;
-      }
-    }
+    // 寫入異動紀錄
+    const changeCount = await saveChanges("devices", changes);
 
+    // 批次 upsert 特材資料
     for (let i = 0; i < devices.length; i += BATCH_SIZE) {
       const batch = devices.slice(i, i + BATCH_SIZE);
       await prisma.$transaction(
@@ -276,6 +275,18 @@ export async function syncDevices(): Promise<SyncResult> {
           });
         })
       );
+    }
+
+    // 標記不在新資料中的品項為停用
+    const incomingCodes = devices.map((d) => d.code);
+    if (incomingCodes.length > 0) {
+      await prisma.device.updateMany({
+        where: {
+          code: { notIn: incomingCodes },
+          status: "給付中",
+        },
+        data: { status: "停用" },
+      });
     }
 
     const finishedAt = new Date();
