@@ -34,6 +34,24 @@ export async function syncDrugs(): Promise<SyncResult> {
     // 3. 寫入異動紀錄
     const changeCount = await saveChanges("drugs", changes);
 
+    // 3b. 記錄藥價歷史（新增與調價品項）
+    const priceChangeItems = changes.filter(
+      (c) => c.changeType === "調價" || c.changeType === "新增"
+    );
+    if (priceChangeItems.length > 0) {
+      const today = new Date().toISOString().split("T")[0];
+      const drugPriceMap = new Map(drugs.map((d) => [d.code, d.price]));
+      await prisma.priceHistory.createMany({
+        data: priceChangeItems
+          .filter((c) => drugPriceMap.has(c.itemCode))
+          .map((c) => ({
+            drugCode: c.itemCode,
+            price: drugPriceMap.get(c.itemCode)!,
+            date: today,
+          })),
+      });
+    }
+
     // 4. 批次 upsert 藥品資料
     for (const drug of drugs) {
       await prisma.drug.upsert({

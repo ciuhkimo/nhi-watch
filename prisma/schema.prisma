@@ -100,6 +100,18 @@ model SyncLog {
   errorMsg     String?
 }
 
+// 藥價歷史紀錄（趨勢圖用）
+model PriceHistory {
+  id        Int      @id @default(autoincrement())
+  drugCode  String                    // 健保代碼
+  price     Float                     // 當時健保價
+  date      String                    // 生效日期（ISO 8601）
+  createdAt DateTime @default(now())
+
+  @@index([drugCode])
+  @@index([drugCode, date])
+}
+
 // HIS 藥碼對照表（未來介接用）
 model DrugMapping {
   id             Int      @id @default(autoincrement())

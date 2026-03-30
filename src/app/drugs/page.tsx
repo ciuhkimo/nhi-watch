@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { exportToExcel } from "@/lib/export-excel";
+
+const PriceTrendChart = dynamic(
+  () => import("@/components/drugs/PriceTrendChart"),
+  { ssr: false }
+);
 
 interface Drug {
   id: number;
@@ -364,6 +370,7 @@ function DrugRow({
                 </div>
               ))}
             </div>
+            <PriceTrendChart drugCode={d.code} />
           </td>
         </tr>
       )}
