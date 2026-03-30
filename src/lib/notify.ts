@@ -48,7 +48,12 @@ export async function notifyChanges(
   const lines = ["\n【NHI-Watch 異動通知】"];
   for (const r of results) {
     if (r.changes > 0) {
-      lines.push(`${r.source === "drugs" ? "藥品" : "診療"}：${r.changes} 筆異動`);
+      const sourceLabel = {
+        drugs: '藥品',
+        devices: '特材',
+        payments: '診療',
+      }[r.source] ?? r.source;
+      lines.push(`${sourceLabel}：${r.changes} 筆異動`);
     }
   }
   lines.push(`\n請至系統查看詳情`);

@@ -64,6 +64,56 @@ export async function detectDrugChanges(
 }
 
 /**
+ * 比對特材資料異動
+ * 偵測新增、調價、停用
+ */
+export async function detectDeviceChanges(
+  incoming: { code: string; name: string; price: number }[]
+): Promise<DiffResult[]> {
+  const changes: DiffResult[] = [];
+  const incomingCodes = new Set(incoming.map((d) => d.code));
+
+  const existing = await prisma.device.findMany({
+    select: { code: true, name: true, price: true, status: true },
+  });
+  const existingMap = new Map(existing.map((d) => [d.code, d]));
+
+  for (const item of incoming) {
+    const old = existingMap.get(item.code);
+
+    if (!old) {
+      changes.push({
+        changeType: "新增",
+        itemCode: item.code,
+        itemName: item.name,
+      });
+    } else if (old.price !== item.price) {
+      changes.push({
+        changeType: "調價",
+        itemCode: item.code,
+        itemName: item.name,
+        field: "price",
+        oldValue: old.price.toString(),
+        newValue: item.price.toString(),
+      });
+    }
+  }
+
+  // 停用偵測：現有給付中的品項不在新資料中
+  for (const old of existing) {
+    if (old.status === "給付中" && !incomingCodes.has(old.code)) {
+      changes.push({
+        changeType: "停用",
+        itemCode: old.code,
+        itemName: old.name,
+      });
+    }
+  }
+
+  return changes;
+}
+
+/**
  * 比對支付標準資料異動
  */
 export async function detectPaymentChanges(
