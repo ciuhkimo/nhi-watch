@@ -150,9 +150,12 @@ function parseRegulationUrl(raw: string): string | null {
   } catch {
     // 非 JSON，可能是純 URL 字串
   }
-  // 直接視為 URL
+  // 可能是逗號分隔的多個 URL，取第一個
   const trimmed = raw.trim();
-  if (trimmed.startsWith("http")) return trimmed;
+  if (trimmed.startsWith("http")) {
+    const firstUrl = trimmed.split(",")[0].trim();
+    return firstUrl || null;
+  }
   return null;
 }
 
