@@ -231,6 +231,16 @@ npx tsx scripts/sync-regulations.ts --limit=100     # 限制抓取筆數
 | 8 | LINE Notify 設定 | 替換真實 token，測試推播 |
 | 9 | 院內伺服器部署 | docker compose up -d，設定 cron 排程 |
 
+### Codex Review 修復摘要（2026-03-30）
+
+針對 GitHub Codex 自動 Review 提出的 3 個問題進行修復：
+
+| 嚴重度 | 檔案 | 問題 | 修復方式 |
+|--------|------|------|----------|
+| P1 | `docker-entrypoint.sh` | `prisma db push` 失敗時靜默繼續，導致容器帶著不完整 schema 啟動 | 移除 `2>/dev/null \|\| true`，改為失敗時 `exit 1` 中止啟動 |
+| P2 | `src/lib/nhi-api.ts` | `parseRegulationUrl()` 對逗號分隔的多 URL 字串直接回傳整串，產生無效 URL | 先 `split(",")` 再取第一個 URL |
+| P2 | `src/app/api/regulations/search/route.ts` | `page=abc` 等非數字參數 `parseInt` 產生 NaN，傳入 Prisma 造成 500 錯誤 | 加入 `\|\| 1` / `\|\| 20` 預設值，NaN 時退回安全值 |
+
 ---
 
 ## 五、Claude Code 啟動步驟
