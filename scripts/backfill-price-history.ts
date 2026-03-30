@@ -80,10 +80,14 @@ async function backfill() {
     // SQLite 有 SQLITE_MAX_VARIABLE_NUMBER 限制，分批寫入
     const BATCH_SIZE = 500;
     for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-      await prisma.priceHistory.createMany({
-        skipDuplicates: true,
-        data: entries.slice(i, i + BATCH_SIZE),
-      });
+      const batch = entries.slice(i, i + BATCH_SIZE);
+      for (const entry of batch) {
+        await prisma.priceHistory.upsert({
+          where: { drugCode_date: { drugCode: entry.drugCode, date: entry.date } },
+          update: { price: entry.price },
+          create: entry,
+        });
+      }
     }
   }
 

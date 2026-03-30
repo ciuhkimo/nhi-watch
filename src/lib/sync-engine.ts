@@ -43,16 +43,20 @@ export async function syncDrugs(): Promise<SyncResult> {
     );
     if (priceChangeItems.length > 0) {
       const drugPriceMap = new Map(drugs.map((d) => [d.code, d.price]));
-      await prisma.priceHistory.createMany({
-        skipDuplicates: true,
-        data: priceChangeItems
-          .filter((c) => drugPriceMap.has(c.itemCode))
-          .map((c) => ({
-            drugCode: c.itemCode,
-            price: drugPriceMap.get(c.itemCode)!,
-            date: today,
-          })),
-      });
+      const historyData = priceChangeItems
+        .filter((c) => drugPriceMap.has(c.itemCode))
+        .map((c) => ({
+          drugCode: c.itemCode,
+          price: drugPriceMap.get(c.itemCode)!,
+          date: today,
+        }));
+      for (const entry of historyData) {
+        await prisma.priceHistory.upsert({
+          where: { drugCode_date: { drugCode: entry.drugCode, date: entry.date } },
+          update: { price: entry.price },
+          create: entry,
+        });
+      }
     }
 
     // 4. 批次 upsert 藥品資料
