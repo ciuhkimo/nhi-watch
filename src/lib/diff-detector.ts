@@ -109,7 +109,7 @@ export async function saveChanges(
 ): Promise<number> {
   if (changes.length === 0) return 0;
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
 
   await prisma.changeLog.createMany({
     data: changes.map((c) => ({

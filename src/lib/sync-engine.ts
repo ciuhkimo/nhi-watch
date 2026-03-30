@@ -2,6 +2,8 @@ import { prisma } from "./db";
 import { fetchAllDrugs, fetchAllDevices, fetchPayments } from "./nhi-api";
 import { detectDrugChanges, detectPaymentChanges, saveChanges } from "./diff-detector";
 
+const BATCH_SIZE = 500;
+
 interface SyncResult {
   source: string;
   status: "success" | "failed";
@@ -16,6 +18,7 @@ interface SyncResult {
  */
 export async function syncDrugs(): Promise<SyncResult> {
   const startedAt = new Date();
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
 
   try {
     // 1. 抓取所有藥品
@@ -39,9 +42,9 @@ export async function syncDrugs(): Promise<SyncResult> {
       (c) => c.changeType === "調價" || c.changeType === "新增"
     );
     if (priceChangeItems.length > 0) {
-      const today = new Date().toISOString().split("T")[0];
       const drugPriceMap = new Map(drugs.map((d) => [d.code, d.price]));
       await prisma.priceHistory.createMany({
+        skipDuplicates: true,
         data: priceChangeItems
           .filter((c) => drugPriceMap.has(c.itemCode))
           .map((c) => ({
@@ -53,41 +56,33 @@ export async function syncDrugs(): Promise<SyncResult> {
     }
 
     // 4. 批次 upsert 藥品資料
-    for (const drug of drugs) {
-      await prisma.drug.upsert({
-        where: { code: drug.code },
-        update: {
-          name: drug.name,
-          generic: drug.generic,
-          form: drug.form,
-          strength: drug.strength,
-          price: drug.price,
-          unit: drug.unit,
-          atcCode: drug.atcCode,
-          manufacturer: drug.manufacturer,
-          category: drug.category,
-          startDate: drug.startDate,
-          endDate: drug.endDate,
-          regulationUrl: drug.regulationUrl,
-          status: drug.endDate && drug.endDate < new Date().toISOString().split("T")[0] ? "停用" : "給付中",
-        },
-        create: {
-          code: drug.code,
-          name: drug.name,
-          generic: drug.generic,
-          form: drug.form,
-          strength: drug.strength,
-          price: drug.price,
-          unit: drug.unit,
-          atcCode: drug.atcCode,
-          manufacturer: drug.manufacturer,
-          category: drug.category,
-          startDate: drug.startDate,
-          endDate: drug.endDate,
-          regulationUrl: drug.regulationUrl,
-          status: drug.endDate && drug.endDate < new Date().toISOString().split("T")[0] ? "停用" : "給付中",
-        },
-      });
+    for (let i = 0; i < drugs.length; i += BATCH_SIZE) {
+      const batch = drugs.slice(i, i + BATCH_SIZE);
+      await prisma.$transaction(
+        batch.map((drug) => {
+          const status = drug.endDate && drug.endDate < today ? "停用" : "給付中";
+          const data = {
+            name: drug.name,
+            generic: drug.generic,
+            form: drug.form,
+            strength: drug.strength,
+            price: drug.price,
+            unit: drug.unit,
+            atcCode: drug.atcCode,
+            manufacturer: drug.manufacturer,
+            category: drug.category,
+            startDate: drug.startDate,
+            endDate: drug.endDate,
+            regulationUrl: drug.regulationUrl,
+            status,
+          };
+          return prisma.drug.upsert({
+            where: { code: drug.code },
+            update: data,
+            create: { code: drug.code, ...data },
+          });
+        })
+      );
     }
 
     // 5. 標記不在新資料中的品項為停用
@@ -170,25 +165,24 @@ export async function syncPayments(): Promise<SyncResult> {
 
     const changeCount = await saveChanges("payments", changes);
 
-    for (const payment of payments) {
-      await prisma.payment.upsert({
-        where: { code: payment.code },
-        update: {
-          name: payment.name,
-          category: payment.category,
-          price: payment.price,
-          unit: payment.unit,
-          startDate: payment.startDate,
-        },
-        create: {
-          code: payment.code,
-          name: payment.name,
-          category: payment.category,
-          price: payment.price,
-          unit: payment.unit,
-          startDate: payment.startDate,
-        },
-      });
+    for (let i = 0; i < payments.length; i += BATCH_SIZE) {
+      const batch = payments.slice(i, i + BATCH_SIZE);
+      await prisma.$transaction(
+        batch.map((payment) => {
+          const data = {
+            name: payment.name,
+            category: payment.category,
+            price: payment.price,
+            unit: payment.unit,
+            startDate: payment.startDate,
+          };
+          return prisma.payment.upsert({
+            where: { code: payment.code },
+            update: data,
+            create: { code: payment.code, ...data },
+          });
+        })
+      );
     }
 
     const finishedAt = new Date();
@@ -248,43 +242,40 @@ export async function syncDevices(): Promise<SyncResult> {
   try {
     const devices = await fetchAllDevices();
 
+    // 預先載入所有現有特材價格，避免逐筆查詢
+    const existingDevices = await prisma.device.findMany({
+      select: { code: true, price: true },
+    });
+    const existingPriceMap = new Map(existingDevices.map((d) => [d.code, d.price]));
+
     let changeCount = 0;
-
     for (const device of devices) {
-      // 偵測是否為新增
-      const existing = await prisma.device.findUnique({
-        where: { code: device.code },
-        select: { price: true },
-      });
-
-      if (!existing) {
-        changeCount++;
-      } else if (existing.price !== device.price) {
+      const existing = existingPriceMap.get(device.code);
+      if (existing === undefined || existing !== device.price) {
         changeCount++;
       }
+    }
 
-      await prisma.device.upsert({
-        where: { code: device.code },
-        update: {
-          name: device.name,
-          category: device.category,
-          price: device.price,
-          selfPay: device.selfPay,
-          unit: device.unit,
-          startDate: device.startDate,
-          status: "給付中",
-        },
-        create: {
-          code: device.code,
-          name: device.name,
-          category: device.category,
-          price: device.price,
-          selfPay: device.selfPay,
-          unit: device.unit,
-          startDate: device.startDate,
-          status: "給付中",
-        },
-      });
+    for (let i = 0; i < devices.length; i += BATCH_SIZE) {
+      const batch = devices.slice(i, i + BATCH_SIZE);
+      await prisma.$transaction(
+        batch.map((device) => {
+          const data = {
+            name: device.name,
+            category: device.category,
+            price: device.price,
+            selfPay: device.selfPay,
+            unit: device.unit,
+            startDate: device.startDate,
+            status: "給付中" as const,
+          };
+          return prisma.device.upsert({
+            where: { code: device.code },
+            update: data,
+            create: { code: device.code, ...data },
+          });
+        })
+      );
     }
 
     const finishedAt = new Date();

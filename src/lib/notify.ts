@@ -60,7 +60,7 @@ export async function notifyChanges(
  * 每日摘要推播（07:30 發送前一天統計）
  */
 export async function notifyDailySummary(): Promise<void> {
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
 
   const [drugCount, deviceCount, paymentCount, todayChanges, lastSync] =
     await Promise.all([

@@ -124,8 +124,8 @@ model PriceHistory {
   date      String                    // 生效日期（ISO 8601）
   createdAt DateTime @default(now())
 
+  @@unique([drugCode, date])
   @@index([drugCode])
-  @@index([drugCode, date])
 }
 
 // HIS 藥碼對照表（未來介接用）
