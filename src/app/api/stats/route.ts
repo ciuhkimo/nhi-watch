@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
+// 強制動態渲染，避免 build 時預渲染靜態數據
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const today = new Date().toISOString().split("T")[0];
