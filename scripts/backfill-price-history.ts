@@ -81,6 +81,7 @@ async function backfill() {
     const BATCH_SIZE = 500;
     for (let i = 0; i < entries.length; i += BATCH_SIZE) {
       await prisma.priceHistory.createMany({
+        skipDuplicates: true,
         data: entries.slice(i, i + BATCH_SIZE),
       });
     }

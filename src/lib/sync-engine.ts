@@ -42,6 +42,7 @@ export async function syncDrugs(): Promise<SyncResult> {
       const today = new Date().toISOString().split("T")[0];
       const drugPriceMap = new Map(drugs.map((d) => [d.code, d.price]));
       await prisma.priceHistory.createMany({
+        skipDuplicates: true,
         data: priceChangeItems
           .filter((c) => drugPriceMap.has(c.itemCode))
           .map((c) => ({
