@@ -27,7 +27,8 @@ model Drug {
   updatedAt    DateTime @default(now()) @updatedAt
 
   // HIS 介接預留欄位
-  hospitalCode String?                   // 院內藥碼（未來由 HIS 對照填入）
+  hospitalCode   String?                   // 院內藥碼（未來由 HIS 對照填入）
+  regulationUrl  String?                   // 給付規定連結（來自 PAYCODE_URL_LIST）
 
   @@index([code])
   @@index([atcCode])
@@ -98,6 +99,21 @@ model SyncLog {
   startedAt    DateTime
   finishedAt   DateTime?
   errorMsg     String?
+}
+
+// 藥品給付規定（全文搜尋用）
+model DrugRegulation {
+  id           Int      @id @default(autoincrement())
+  drugCode     String                    // 健保代碼（對應 Drug.code）
+  payCode      String                    // 給付代碼（章節編號，如 8.2.1）
+  title        String                    // 規定標題
+  content      String                    // 給付規定全文
+  sourceUrl    String?                   // 原始連結
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@unique([drugCode, payCode])
+  @@index([drugCode])
+  @@index([payCode])
 }
 
 // 藥價歷史紀錄（趨勢圖用）

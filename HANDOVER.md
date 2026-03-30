@@ -160,6 +160,51 @@ npx tsx scripts/backfill-price-history.ts
 - 41 個單元測試全部通過（含 7 個新增的 price-history 測試）
 - `npm run build` 零錯誤，所有頁面 + API 編譯成功
 
+### v1.2 藥品給付規定全文搜尋 完成摘要（2026-03-30）
+
+#### 新增功能
+- `/regulations` 給付規定全文搜尋頁面（即時搜尋 + 關鍵字高亮 + 展開全文）
+- 藥品查詢頁展開詳情顯示「查看給付規定」連結
+- 同步引擎自動擷取健保署 `PAYCODE_URL_LIST` 並存入 `Drug.regulationUrl`
+- 獨立腳本批次下載並解析給付規定 HTML 頁面，儲存全文至 `DrugRegulation` 表
+
+#### 新增檔案
+| 檔案 | 說明 |
+|------|------|
+| `prisma/migrations/…add_drug_regulation/` | DrugRegulation 資料表 + Drug.regulationUrl 欄位 |
+| `src/lib/regulation-search.ts` | 給付規定抓取、解析、全文搜尋引擎 |
+| `src/app/regulations/page.tsx` | 給付規定搜尋頁面（搜尋框 + 結果列表 + 展開全文 + 高亮） |
+| `src/app/api/regulations/search/route.ts` | 全文搜尋 API（GET /api/regulations/search?q=） |
+| `src/app/api/drugs/[code]/regulation/route.ts` | 單一藥品給付規定 API |
+| `scripts/sync-regulations.ts` | 給付規定同步腳本（--force / --limit=N） |
+| `src/__tests__/regulation-search.test.ts` | 18 個單元測試 |
+
+#### 修改檔案
+| 檔案 | 修改內容 |
+|------|----------|
+| `prisma/schema.prisma` | 新增 `DrugRegulation` model + `Drug.regulationUrl` 欄位 |
+| `src/lib/nhi-api.ts` | 解析 `PAYCODE_URL_LIST` 欄位，新增 `parseRegulationUrl()` |
+| `src/lib/sync-engine.ts` | `syncDrugs()` upsert 時儲存 `regulationUrl` |
+| `src/app/drugs/page.tsx` | 展開詳情加入「查看給付規定」連結 |
+| `src/components/layout/Sidebar.tsx` | 側邊欄新增「給付規定」導覽項目 |
+
+#### 使用方式
+```bash
+# 1. 先執行藥品同步（會擷取 regulationUrl）
+npx tsx scripts/sync-daily.ts
+
+# 2. 再執行給付規定同步（批次下載給付規定全文）
+npx tsx scripts/sync-regulations.ts
+
+# 選項：
+npx tsx scripts/sync-regulations.ts --force        # 強制全部重新抓取
+npx tsx scripts/sync-regulations.ts --limit=100     # 限制抓取筆數
+```
+
+#### 測試結果
+- 59 個單元測試全部通過（含 18 個新增的 regulation-search 測試）
+- `npm run build` 零錯誤，6 個頁面 + 8 個 API 端點編譯成功
+
 ---
 
 ## Phase 2 完成總結

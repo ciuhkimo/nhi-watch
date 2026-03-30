@@ -68,6 +68,7 @@ export async function syncDrugs(): Promise<SyncResult> {
           category: drug.category,
           startDate: drug.startDate,
           endDate: drug.endDate,
+          regulationUrl: drug.regulationUrl,
           status: drug.endDate && drug.endDate < new Date().toISOString().split("T")[0] ? "停用" : "給付中",
         },
         create: {
@@ -83,6 +84,7 @@ export async function syncDrugs(): Promise<SyncResult> {
           category: drug.category,
           startDate: drug.startDate,
           endDate: drug.endDate,
+          regulationUrl: drug.regulationUrl,
           status: drug.endDate && drug.endDate < new Date().toISOString().split("T")[0] ? "停用" : "給付中",
         },
       });

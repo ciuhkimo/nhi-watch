@@ -57,6 +57,7 @@ export interface DrugData {
   category: string | null;
   startDate: string | null;
   endDate: string | null;
+  regulationUrl: string | null;
 }
 
 export interface DeviceData {
@@ -135,6 +136,26 @@ function classifyDrugForm(form: string): string | null {
 /**
  * 將 API 原始資料轉換為 DrugData
  */
+/**
+ * 解析 PAYCODE_URL_LIST，提取第一個給付規定連結
+ * 格式可能是 JSON array 或逗號分隔的 URL 字串
+ */
+function parseRegulationUrl(raw: string): string | null {
+  if (!raw || raw.trim() === "") return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed[0]?.URL || parsed[0] || null;
+    }
+  } catch {
+    // 非 JSON，可能是純 URL 字串
+  }
+  // 直接視為 URL
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("http")) return trimmed;
+  return null;
+}
+
 function mapDrugRecord(raw: NhiDrugRaw): DrugData {
   return {
     code: raw.Q1_ID || "",
@@ -149,6 +170,7 @@ function mapDrugRecord(raw: NhiDrugRaw): DrugData {
     category: classifyDrugForm(raw.DRUG_FORM),
     startDate: rocDateToIso(raw.START_DATE),
     endDate: rocDateToIso(raw.END_DATE),
+    regulationUrl: parseRegulationUrl(raw.PAYCODE_URL_LIST),
   };
 }
 

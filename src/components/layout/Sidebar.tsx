@@ -10,6 +10,7 @@ const navItems = [
   { href: "/devices", label: "特材查詢", icon: "🩺" },
   { href: "/payments", label: "診療支付", icon: "📋" },
   { href: "/changes", label: "異動紀錄", icon: "🔔" },
+  { href: "/regulations", label: "給付規定", icon: "📜" },
 ];
 
 export default function Sidebar() {
