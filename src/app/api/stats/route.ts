@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
 
     const [drugCount, deviceCount, paymentCount, todayChanges, lastSync] =
       await Promise.all([

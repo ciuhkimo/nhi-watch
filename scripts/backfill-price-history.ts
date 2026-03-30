@@ -59,7 +59,7 @@ async function backfill() {
     select: { code: true, price: true },
   });
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
   const existingHistoryCodes = new Set(entries.map((e) => e.drugCode));
 
   for (const drug of drugs) {

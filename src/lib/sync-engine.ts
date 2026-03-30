@@ -16,6 +16,7 @@ interface SyncResult {
  */
 export async function syncDrugs(): Promise<SyncResult> {
   const startedAt = new Date();
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
 
   try {
     // 1. 抓取所有藥品
@@ -39,7 +40,6 @@ export async function syncDrugs(): Promise<SyncResult> {
       (c) => c.changeType === "調價" || c.changeType === "新增"
     );
     if (priceChangeItems.length > 0) {
-      const today = new Date().toISOString().split("T")[0];
       const drugPriceMap = new Map(drugs.map((d) => [d.code, d.price]));
       await prisma.priceHistory.createMany({
         skipDuplicates: true,
@@ -70,7 +70,7 @@ export async function syncDrugs(): Promise<SyncResult> {
           startDate: drug.startDate,
           endDate: drug.endDate,
           regulationUrl: drug.regulationUrl,
-          status: drug.endDate && drug.endDate < new Date().toISOString().split("T")[0] ? "停用" : "給付中",
+          status: drug.endDate && drug.endDate < today ? "停用" : "給付中",
         },
         create: {
           code: drug.code,
@@ -86,7 +86,7 @@ export async function syncDrugs(): Promise<SyncResult> {
           startDate: drug.startDate,
           endDate: drug.endDate,
           regulationUrl: drug.regulationUrl,
-          status: drug.endDate && drug.endDate < new Date().toISOString().split("T")[0] ? "停用" : "給付中",
+          status: drug.endDate && drug.endDate < today ? "停用" : "給付中",
         },
       });
     }

@@ -302,7 +302,7 @@ export async function fetchDevices(
  * 抓取所有有效特材品項（自動分頁 + 過濾 + 去重）
  */
 export async function fetchAllDevices(): Promise<DeviceData[]> {
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
   const deviceMap = new Map<string, DeviceData>();
   let page = 1;
   const pageSize = 5000;
