@@ -1,7 +1,7 @@
 #!/bin/sh
 # 確保資料庫 schema 為最新
 echo "檢查資料庫..."
-cd /app && npx prisma db push --skip-generate
+cd /app && node node_modules/prisma/build/index.js db push --skip-generate
 if [ $? -ne 0 ]; then
   echo "資料庫 schema 同步失敗，中止啟動"
   exit 1
