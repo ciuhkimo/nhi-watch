@@ -19,7 +19,7 @@ async function upsertDrugRaw(drug: DrugData, today: string) {
   const esc = (v: string | null) => v ?? null;
 
   await prisma.$executeRawUnsafe(
-    `INSERT INTO drugs (code, name, generic, form, strength, price, unit, atcCode, manufacturer, category, startDate, endDate, regulationUrl, status, updatedAt)
+    `INSERT INTO Drug (code, name, generic, form, strength, price, unit, atcCode, manufacturer, category, startDate, endDate, regulationUrl, status, updatedAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(code) DO UPDATE SET
        name=excluded.name, generic=excluded.generic, form=excluded.form,
