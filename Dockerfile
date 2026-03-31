@@ -33,10 +33,6 @@ COPY --from=builder /app/prisma/migrations ./prisma/migrations
 COPY --from=builder /app/prisma/dev.db ./prisma/dev.db
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
-# prisma CLI 供 entrypoint 使用
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 RUN chown -R nextjs:nodejs /app/prisma
 
