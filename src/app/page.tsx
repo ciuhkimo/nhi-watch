@@ -65,15 +65,34 @@ export default function DashboardPage() {
     try {
       const res = await fetch("/api/sync", { method: "POST" });
       const data = await res.json();
-      if (data.success) {
-        alert(`同步完成！${data.data?.map((r: { source: string; records: number; changes: number }) => `${r.source}: ${r.records} 筆, ${r.changes} 筆異動`).join("；") || ""}`);
-      } else {
-        alert(`同步失敗：${data.error || "未知錯誤"}`);
+      if (!data.success) {
+        alert(`同步啟動失敗：${data.error || "未知錯誤"}`);
+        setSyncing(false);
+        return;
       }
-      await loadData();
+      // 輪詢同步狀態
+      const poll = setInterval(async () => {
+        try {
+          const statusRes = await fetch("/api/sync");
+          const statusData = await statusRes.json();
+          if (!statusData.data?.running) {
+            clearInterval(poll);
+            setSyncing(false);
+            const result = statusData.data?.lastResult;
+            if (result?.success) {
+              const summary = (result.data as { source: string; records: number; changes: number }[])
+                ?.map((r) => `${r.source}: ${r.records} 筆`)
+                .join("；");
+              alert(`同步完成！${summary || ""}`);
+            } else {
+              alert(`同步失敗：${result?.error || "未知錯誤"}`);
+            }
+            await loadData();
+          }
+        } catch { /* 繼續輪詢 */ }
+      }, 5000);
     } catch {
-      alert("同步請求失敗，可能超時，請稍後重整頁面查看");
-    } finally {
+      alert("同步請求失敗");
       setSyncing(false);
     }
   }
