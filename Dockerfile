@@ -11,6 +11,7 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ENV DATABASE_URL="file:./prisma/dev.db"
 RUN npx prisma generate
 # 建立空 DB 讓 Prisma 可以在 build 時 prerender
 RUN npx prisma db push --skip-generate
