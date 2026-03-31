@@ -32,14 +32,19 @@ COPY --from=builder /app/prisma/migrations ./prisma/migrations
 COPY --from=builder /app/prisma/dev.db ./prisma/dev.db
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
+# prisma CLI 供 entrypoint 使用
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 RUN chown -R nextjs:nodejs /app/prisma
 
 USER nextjs
 
-EXPOSE 3000
+EXPOSE ${PORT:-3000}
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 ENV DATABASE_URL="file:./dev.db"
 
+# Railway 會透過環境變數覆蓋 PORT
 CMD ["sh", "docker-entrypoint.sh"]
