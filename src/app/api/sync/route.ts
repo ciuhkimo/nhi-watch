@@ -3,18 +3,11 @@ import { syncAll } from "@/lib/sync-engine";
 import { notifyChanges } from "@/lib/notify";
 
 export async function POST(request: NextRequest) {
-  // 驗證 API key
+  // 驗證 API key（未設定 SYNC_SECRET 時跳過驗證，方便 demo）
   const authHeader = request.headers.get("authorization");
   const syncSecret = process.env.SYNC_SECRET;
 
-  if (!syncSecret) {
-    return NextResponse.json(
-      { success: false, error: "SYNC_SECRET 未設定" },
-      { status: 500 }
-    );
-  }
-
-  if (authHeader !== `Bearer ${syncSecret}`) {
+  if (syncSecret && authHeader !== `Bearer ${syncSecret}`) {
     return NextResponse.json(
       { success: false, error: "未授權" },
       { status: 401 }

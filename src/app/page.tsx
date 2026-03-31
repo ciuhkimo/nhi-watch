@@ -63,8 +63,16 @@ export default function DashboardPage() {
   async function handleSync() {
     setSyncing(true);
     try {
-      await fetch("/api/sync", { method: "POST" });
+      const res = await fetch("/api/sync", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        alert(`同步完成！${data.data?.map((r: { source: string; records: number; changes: number }) => `${r.source}: ${r.records} 筆, ${r.changes} 筆異動`).join("；") || ""}`);
+      } else {
+        alert(`同步失敗：${data.error || "未知錯誤"}`);
+      }
       await loadData();
+    } catch {
+      alert("同步請求失敗，可能超時，請稍後重整頁面查看");
     } finally {
       setSyncing(false);
     }
