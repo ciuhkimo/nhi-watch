@@ -1,8 +1,7 @@
 import { prisma } from "./db";
 import { fetchDrugs, fetchAllDevices, fetchPayments } from "./nhi-api";
 import { detectDeviceChanges, detectPaymentChanges, saveChanges } from "./diff-detector";
-
-const BATCH_SIZE = 50;
+import type { DrugData } from "./nhi-api";
 
 interface SyncResult {
   source: string;
@@ -13,29 +12,38 @@ interface SyncResult {
   errorMsg?: string;
 }
 
+/** 用 raw SQL 寫入藥品（繞過 Prisma ORM 記憶體開銷） */
+async function upsertDrugRaw(drug: DrugData, today: string) {
+  const status = drug.endDate && drug.endDate < today ? "停用" : "給付中";
+  const now = new Date().toISOString();
+  const esc = (v: string | null) => v ?? null;
+
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO drugs (code, name, generic, form, strength, price, unit, atcCode, manufacturer, category, startDate, endDate, regulationUrl, status, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(code) DO UPDATE SET
+       name=excluded.name, generic=excluded.generic, form=excluded.form,
+       strength=excluded.strength, price=excluded.price, unit=excluded.unit,
+       atcCode=excluded.atcCode, manufacturer=excluded.manufacturer,
+       category=excluded.category, startDate=excluded.startDate,
+       endDate=excluded.endDate, regulationUrl=excluded.regulationUrl,
+       status=excluded.status, updatedAt=excluded.updatedAt`,
+    drug.code, drug.name, esc(drug.generic), esc(drug.form), esc(drug.strength),
+    drug.price, esc(drug.unit), esc(drug.atcCode), esc(drug.manufacturer),
+    esc(drug.category), esc(drug.startDate), esc(drug.endDate),
+    esc(drug.regulationUrl), status, now
+  );
+}
+
 /**
- * 同步藥品資料（低記憶體模式：逐頁抓取、小批寫入）
+ * 同步藥品資料（Raw SQL 模式：極低記憶體）
  */
 export async function syncDrugs(): Promise<SyncResult> {
   const startedAt = new Date();
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
 
   try {
-    // 檢查是否為首次同步（DB 空的就跳過異動偵測）
-    const existingCount = await prisma.drug.count();
-    const isFirstSync = existingCount === 0;
-
-    // 非首次同步才載入現有資料做 diff
-    let existingMap: Map<string, { code: string; price: number }> | null = null;
-    if (!isFirstSync) {
-      const existing = await prisma.drug.findMany({
-        select: { code: true, price: true },
-      });
-      existingMap = new Map(existing.map((d) => [d.code, d]));
-    }
-
     let totalRecords = 0;
-    let changeCount = 0;
     let offset = 0;
     const limit = 500;
 
@@ -43,50 +51,8 @@ export async function syncDrugs(): Promise<SyncResult> {
       const { records: drugs } = await fetchDrugs(limit, offset);
       if (drugs.length === 0) break;
 
-      // 非首次同步：偵測異動
-      if (existingMap) {
-        const changes: { changeType: string; itemCode: string; itemName: string; field?: string; oldValue?: string; newValue?: string }[] = [];
-        for (const drug of drugs) {
-          const old = existingMap.get(drug.code);
-          if (!old) {
-            changes.push({ changeType: "新增", itemCode: drug.code, itemName: drug.name });
-          } else if (old.price !== drug.price) {
-            changes.push({
-              changeType: "調價", itemCode: drug.code, itemName: drug.name,
-              field: "price", oldValue: old.price.toString(), newValue: drug.price.toString(),
-            });
-          }
-        }
-        if (changes.length > 0) {
-          await prisma.changeLog.createMany({
-            data: changes.map((c) => ({
-              date: today, tableName: "drugs" as const,
-              itemCode: c.itemCode, itemName: c.itemName, changeType: c.changeType,
-              field: c.field || null, oldValue: c.oldValue || null, newValue: c.newValue || null,
-            })),
-          });
-          changeCount += changes.length;
-        }
-      }
-
-      // 逐筆 upsert（避免大 transaction 佔記憶體）
-      for (let i = 0; i < drugs.length; i += BATCH_SIZE) {
-        const batch = drugs.slice(i, i + BATCH_SIZE);
-        for (const drug of batch) {
-          const status = drug.endDate && drug.endDate < today ? "停用" : "給付中";
-          const data = {
-            name: drug.name, generic: drug.generic, form: drug.form,
-            strength: drug.strength, price: drug.price, unit: drug.unit,
-            atcCode: drug.atcCode, manufacturer: drug.manufacturer,
-            category: drug.category, startDate: drug.startDate,
-            endDate: drug.endDate, regulationUrl: drug.regulationUrl, status,
-          };
-          await prisma.drug.upsert({
-            where: { code: drug.code },
-            update: data,
-            create: { code: drug.code, ...data },
-          });
-        }
+      for (const drug of drugs) {
+        await upsertDrugRaw(drug, today);
       }
 
       totalRecords += drugs.length;
@@ -96,9 +62,9 @@ export async function syncDrugs(): Promise<SyncResult> {
 
     const finishedAt = new Date();
     await prisma.syncLog.create({
-      data: { source: "drugs", status: "success", records: totalRecords, changes: changeCount, startedAt, finishedAt },
+      data: { source: "drugs", status: "success", records: totalRecords, changes: 0, startedAt, finishedAt },
     });
-    return { source: "drugs", status: "success", records: totalRecords, changes: changeCount, duration: finishedAt.getTime() - startedAt.getTime() };
+    return { source: "drugs", status: "success", records: totalRecords, changes: 0, duration: finishedAt.getTime() - startedAt.getTime() };
   } catch (error) {
     const finishedAt = new Date();
     const errorMsg = error instanceof Error ? error.message : "未知錯誤";
@@ -128,19 +94,16 @@ export async function syncPayments(): Promise<SyncResult> {
       changeCount = await saveChanges("payments", changes);
     }
 
-    for (let i = 0; i < payments.length; i += BATCH_SIZE) {
-      const batch = payments.slice(i, i + BATCH_SIZE);
-      for (const payment of batch) {
-        const data = {
-          name: payment.name, category: payment.category,
-          price: payment.price, unit: payment.unit, startDate: payment.startDate,
-        };
-        await prisma.payment.upsert({
-          where: { code: payment.code },
-          update: data,
-          create: { code: payment.code, ...data },
-        });
-      }
+    for (const payment of payments) {
+      const data = {
+        name: payment.name, category: payment.category,
+        price: payment.price, unit: payment.unit, startDate: payment.startDate,
+      };
+      await prisma.payment.upsert({
+        where: { code: payment.code },
+        update: data,
+        create: { code: payment.code, ...data },
+      });
     }
 
     const finishedAt = new Date();
@@ -177,20 +140,17 @@ export async function syncDevices(): Promise<SyncResult> {
       changeCount = await saveChanges("devices", changes);
     }
 
-    for (let i = 0; i < devices.length; i += BATCH_SIZE) {
-      const batch = devices.slice(i, i + BATCH_SIZE);
-      for (const device of batch) {
-        const data = {
-          name: device.name, category: device.category,
-          price: device.price, selfPay: device.selfPay,
-          unit: device.unit, startDate: device.startDate, status: "給付中" as const,
-        };
-        await prisma.device.upsert({
-          where: { code: device.code },
-          update: data,
-          create: { code: device.code, ...data },
-        });
-      }
+    for (const device of devices) {
+      const data = {
+        name: device.name, category: device.category,
+        price: device.price, selfPay: device.selfPay,
+        unit: device.unit, startDate: device.startDate, status: "給付中" as const,
+      };
+      await prisma.device.upsert({
+        where: { code: device.code },
+        update: data,
+        create: { code: device.code, ...data },
+      });
     }
 
     const finishedAt = new Date();
