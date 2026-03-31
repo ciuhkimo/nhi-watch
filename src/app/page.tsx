@@ -60,39 +60,51 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
-  async function handleSync() {
-    setSyncing(true);
-    try {
-      const res = await fetch("/api/sync", { method: "POST" });
-      const data = await res.json();
-      if (!data.success) {
-        alert(`同步啟動失敗：${data.error || "未知錯誤"}`);
-        setSyncing(false);
-        return;
-      }
-      // 輪詢同步狀態
+  // 等待同步完成的輔助函式
+  async function waitForSyncDone(): Promise<{ success: boolean; data?: unknown; error?: string }> {
+    return new Promise((resolve) => {
       const poll = setInterval(async () => {
         try {
-          const statusRes = await fetch("/api/sync");
-          const statusData = await statusRes.json();
-          if (!statusData.data?.running) {
+          const res = await fetch("/api/sync");
+          const json = await res.json();
+          if (!json.data?.running) {
             clearInterval(poll);
-            setSyncing(false);
-            const result = statusData.data?.lastResult;
-            if (result?.success) {
-              const summary = (result.data as { source: string; records: number; changes: number }[])
-                ?.map((r) => `${r.source}: ${r.records} 筆`)
-                .join("；");
-              alert(`同步完成！${summary || ""}`);
-            } else {
-              alert(`同步失敗：${result?.error || "未知錯誤"}`);
-            }
-            await loadData();
+            resolve(json.data?.lastResult || { success: false, error: "無結果" });
           }
         } catch { /* 繼續輪詢 */ }
       }, 5000);
+    });
+  }
+
+  async function handleSync() {
+    setSyncing(true);
+    const sources = ["drugs", "devices", "payments"];
+    const labels: Record<string, string> = { drugs: "藥品", devices: "特材", payments: "診療" };
+    const allResults: string[] = [];
+
+    try {
+      for (const source of sources) {
+        const res = await fetch(`/api/sync?source=${source}`, { method: "POST" });
+        const data = await res.json();
+        if (!data.success) {
+          allResults.push(`${labels[source]}：啟動失敗 - ${data.error}`);
+          continue;
+        }
+        // 等待這一步完成
+        const result = await waitForSyncDone();
+        if (result.success) {
+          const items = result.data as { source: string; records: number; changes: number }[];
+          const r = items?.[0];
+          allResults.push(`${labels[source]}：${r?.records || 0} 筆`);
+        } else {
+          allResults.push(`${labels[source]}：失敗 - ${result.error}`);
+        }
+        await loadData();
+      }
+      alert(`同步完成！\n${allResults.join("\n")}`);
     } catch {
       alert("同步請求失敗");
+    } finally {
       setSyncing(false);
     }
   }

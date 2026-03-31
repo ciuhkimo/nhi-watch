@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { syncAll } from "@/lib/sync-engine";
+import { syncDrugs, syncDevices, syncPayments } from "@/lib/sync-engine";
 
 // 同步狀態（記憶體中，重啟後重置）
 let syncStatus: {
   running: boolean;
+  currentSource?: string;
   lastResult?: { success: boolean; data?: unknown; error?: string; finishedAt: string };
 } = { running: false };
 
@@ -21,14 +22,32 @@ export async function POST(request: NextRequest) {
 
   if (syncStatus.running) {
     return NextResponse.json(
-      { success: false, error: "同步進行中，請稍後再試" },
+      { success: false, error: `同步進行中（${syncStatus.currentSource}），請稍後再試` },
       { status: 409 }
     );
   }
 
-  // 背景執行同步，立即回應
+  // 支援 ?source=drugs|devices|payments，預設全部依序執行
+  const url = new URL(request.url);
+  const source = url.searchParams.get("source");
+
   syncStatus.running = true;
-  syncAll()
+
+  const run = async () => {
+    const results = [];
+    const sources = source ? [source] : ["drugs", "devices", "payments"];
+
+    for (const s of sources) {
+      syncStatus.currentSource = s;
+      if (s === "drugs") results.push(await syncDrugs());
+      else if (s === "devices") results.push(await syncDevices());
+      else if (s === "payments") results.push(await syncPayments());
+    }
+
+    return results;
+  };
+
+  run()
     .then((results) => {
       syncStatus = {
         running: false,
@@ -46,7 +65,7 @@ export async function POST(request: NextRequest) {
       };
     });
 
-  return NextResponse.json({ success: true, message: "同步已在背景啟動" });
+  return NextResponse.json({ success: true, message: `同步已在背景啟動（${source || "全部"}）` });
 }
 
 // 查詢同步狀態
