@@ -46,16 +46,18 @@ export async function syncDrugs(): Promise<SyncResult> {
     let totalRecords = 0;
     let offset = 0;
     const limit = 500;
+    const MAX_RECORDS = 3000; // Demo 模式：限制筆數避免 OOM
 
-    while (true) {
+    while (totalRecords < MAX_RECORDS) {
       const { records: drugs } = await fetchDrugs(limit, offset);
       if (drugs.length === 0) break;
 
       for (const drug of drugs) {
+        if (totalRecords >= MAX_RECORDS) break;
         await upsertDrugRaw(drug, today);
+        totalRecords++;
       }
 
-      totalRecords += drugs.length;
       offset += limit;
       if (drugs.length < limit) break;
     }
