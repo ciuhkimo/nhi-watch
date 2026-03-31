@@ -42,6 +42,7 @@ EXPOSE ${PORT:-3000}
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 ENV DATABASE_URL="file:./dev.db"
+ENV NODE_OPTIONS="--max-old-space-size=384"
 
 # Railway 會透過環境變數覆蓋 PORT
 CMD ["sh", "docker-entrypoint.sh"]
